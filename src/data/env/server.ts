@@ -18,7 +18,9 @@ export const env = createEnv({
    *
    * 💡 You'll get type errors if these are not prefixed with NEXT_PUBLIC_.
    */
-  client: {},
+  client: {
+    NEXT_PUBLIC_BASE_URL: z.string().min(1),
+  },
   /*
    * Specify what values should be validated by your schemas above.
    *
@@ -27,6 +29,6 @@ export const env = createEnv({
    * only specify client-side variables.
    */
   experimental__runtimeEnv: {
-    // NEXT_PUBLIC_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_PUBLISHABLE_KEY,
+    NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL,
   },
 });

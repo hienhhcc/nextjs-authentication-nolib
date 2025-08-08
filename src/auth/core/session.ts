@@ -4,10 +4,10 @@ import { SessionTable, userRoles, UserTable } from "@/drizzle/schema";
 import { z } from "zod";
 import { eq, and, gt } from "drizzle-orm";
 import { db } from "@/drizzle/db";
-import { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
-
-const SESSION_EXPIRATION_SECONDS = 60 * 60 * 24 * 7;
-export const COOKIE_SESSION_KEY = "cookie-id";
+import {
+  SESSION_EXPIRATION_SECONDS,
+  COOKIE_SESSION_KEY,
+} from "@/auth/core/constants";
 
 const sessionSchema = z.object({
   id: z.string(),
@@ -16,9 +16,24 @@ const sessionSchema = z.object({
 
 type UserSession = z.infer<typeof sessionSchema>;
 
+export type Cookies = {
+  set: (
+    key: string,
+    value: string,
+    options: {
+      secure?: boolean;
+      httpOnly?: boolean;
+      sameSite?: "strict" | "lax";
+      expires?: number;
+    }
+  ) => void;
+  get: (key: string) => { name: string; value: string } | undefined;
+  delete: (key: string) => void;
+};
+
 export async function createUserSession(
   user: UserSession,
-  cookieStore: ReadonlyRequestCookies
+  cookieStore: Cookies
 ) {
   const sessionId = crypto.randomBytes(512).toString("hex").normalize();
 
@@ -37,10 +52,10 @@ export async function createUserSession(
   setSessionCookie(sessionId, expiresAtInMilliseconds, cookieStore);
 }
 
-async function setSessionCookie(
+export async function setSessionCookie(
   sessionId: string,
   expiresAtInMilliseconds: number,
-  cookieStore: ReadonlyRequestCookies
+  cookieStore: Cookies
 ) {
   cookieStore.set(COOKIE_SESSION_KEY, sessionId, {
     expires: expiresAtInMilliseconds,
@@ -50,7 +65,7 @@ async function setSessionCookie(
   });
 }
 
-export async function getUserFromSession(cookieStore: ReadonlyRequestCookies) {
+export async function getUserFromSession(cookieStore: Pick<Cookies, "get">) {
   const sessionId = cookieStore.get(COOKIE_SESSION_KEY)?.value;
 
   if (sessionId == null) return null;
@@ -74,4 +89,19 @@ export async function getUserFromSession(cookieStore: ReadonlyRequestCookies) {
     .limit(1);
 
   return user;
+}
+
+export async function updateUserSessionData(
+  user: UserSession,
+  cookies: Pick<Cookies, "get">
+) {
+  const sessionId = cookies.get(COOKIE_SESSION_KEY)?.value;
+  if (sessionId == null) return null;
+
+  await db
+    .update(SessionTable)
+    .set({
+      expiresAt: new Date(Date.now() + SESSION_EXPIRATION_SECONDS * 1000),
+    })
+    .where(eq(SessionTable.id, sessionId));
 }

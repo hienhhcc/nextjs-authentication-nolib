@@ -11,8 +11,9 @@ import { z } from "zod";
 import { SessionTable, UserTable } from "@/drizzle/schema";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { COOKIE_SESSION_KEY, createUserSession } from "@/auth/core/session";
+import { createUserSession } from "@/auth/core/session";
 import { eq } from "drizzle-orm/sql";
+import { COOKIE_SESSION_KEY } from "@/auth/core/constants";
 
 export async function logOut() {
   const cookieStore = await cookies();
