@@ -7,7 +7,7 @@ import { db } from "@/drizzle/db";
 import { ReadonlyRequestCookies } from "next/dist/server/web/spec-extension/adapters/request-cookies";
 
 const SESSION_EXPIRATION_SECONDS = 60 * 60 * 24 * 7;
-const COOKIE_SESSION_KEY = "cookie-id";
+export const COOKIE_SESSION_KEY = "cookie-id";
 
 const sessionSchema = z.object({
   id: z.string(),
