@@ -35,7 +35,7 @@ export function SignInForm() {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
         {error && <p className="text-destructive">{error}</p>}
-        {/* <div className="flex gap-4">
+        <div className="flex gap-4">
           <Button
             type="button"
             onClick={async () => await oAuthSignIn("discord")}
@@ -48,7 +48,7 @@ export function SignInForm() {
           >
             GitHub
           </Button>
-        </div> */}
+        </div>
         <FormField
           control={form.control}
           name="email"

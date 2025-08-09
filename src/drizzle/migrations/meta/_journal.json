@@ -15,6 +15,20 @@
       "when": 1754649649088,
       "tag": "0001_colossal_malice",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1754708872791,
+      "tag": "0002_glamorous_karnak",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1754713099398,
+      "tag": "0003_crazy_captain_midlands",
+      "breakpoints": true
     }
   ]
 }

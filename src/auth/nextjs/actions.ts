@@ -8,12 +8,13 @@ import {
 import { signInSchema, signUpSchema } from "@/auth/nextjs/schemas";
 import { db } from "@/drizzle/db";
 import { z } from "zod";
-import { SessionTable, UserTable } from "@/drizzle/schema";
+import { OAuthProvider, SessionTable, UserTable } from "@/drizzle/schema";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createUserSession } from "@/auth/core/session";
 import { eq } from "drizzle-orm/sql";
 import { COOKIE_SESSION_KEY } from "@/auth/core/constants";
+import { OAuthClient } from "@/auth/core/oauth/base";
 
 export async function logOut() {
   const cookieStore = await cookies();
@@ -95,4 +96,8 @@ export async function signUp(unsafeData: z.infer<typeof signUpSchema>) {
   redirect("/");
 }
 
-export async function oAuthSignIn() {}
+export async function oAuthSignIn(provider: OAuthProvider) {
+  //TODO: Get OAuth url
+
+  redirect(new OAuthClient().createAuthUrl(await cookies()));
+}
