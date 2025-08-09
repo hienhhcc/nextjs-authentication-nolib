@@ -1,59 +1,118 @@
+import crypto from "crypto";
 import { Cookies } from "@/auth/core/types";
 import { env } from "@/data/env/server";
 import z from "zod";
+import { OAuthProvider } from "@/drizzle/schema";
+import { createDiscordOAuthClient } from "@/auth/core/oauth/discord";
+import { createGithubOAuthClient } from "@/auth/core/oauth/github";
+
+const STATE_COOKIE_KEY = "oAuthState";
+const COOKIE_EXPIRATION_SECONDS = 10 * 60;
+const CODE_VERIFIER_COOKIE_KEY = "oAuthCodeVerifier";
 
 export class OAuthClient<T> {
+  private readonly provider: OAuthProvider;
+  private readonly clientId: string;
+  private readonly clientSecret: string;
+  private readonly scopes: string[];
+  private readonly urls: {
+    auth: string;
+    token: string;
+    user: string;
+  };
+  private readonly userInfo: {
+    schema: z.ZodType<T>;
+    parser: (data: T) => { id: string; email: string; name: string };
+  };
+
   private readonly tokenSchema = z.object({
     access_token: z.string(),
     token_type: z.string(),
   });
 
-  private readonly userSchema = z.object({
-    id: z.string(),
-    username: z.string(),
-    global_name: z.string().nullable(),
-    email: z.email(),
-  });
+  constructor({
+    provider,
+    clientId,
+    clientSecret,
+    scopes,
+    urls,
+    userInfo,
+  }: {
+    provider: OAuthProvider;
+    clientId: string;
+    clientSecret: string;
+    scopes: string[];
+    urls: {
+      auth: string;
+      token: string;
+      user: string;
+    };
+    userInfo: {
+      schema: z.ZodType<T>;
+      parser: (data: T) => { id: string; email: string; name: string };
+    };
+  }) {
+    this.provider = provider;
+    this.clientId = clientId;
+    this.clientSecret = clientSecret;
+    this.scopes = scopes;
+    this.urls = urls;
+    this.userInfo = userInfo;
+  }
 
   private get redirectUrl() {
-    return new URL("discord", env.OAUTH_REDIRECT_URL_BASE);
+    return new URL(this.provider, env.OAUTH_REDIRECT_URL_BASE);
   }
 
   createAuthUrl(cookies: Pick<Cookies, "set">) {
-    const url = new URL("https://discord.com/oauth2/authorize");
-    url.searchParams.set("client_id", env.DISCORD_CLIENT_ID);
+    const state = createState(cookies);
+    const codeVerifier = createCodeVerifier(cookies);
+
+    const url = new URL(this.urls.auth);
+    url.searchParams.set("client_id", this.clientId);
     url.searchParams.set("redirect_uri", this.redirectUrl.toString());
     url.searchParams.set("response_type", "code");
-    url.searchParams.set("scope", "identify email");
+    url.searchParams.set("scope", this.scopes.join(" "));
+    url.searchParams.set("state", state);
+    url.searchParams.set("code_challenge_method", "S256");
+    url.searchParams.set(
+      "code_challenge",
+      crypto.hash("sha256", codeVerifier, "base64url")
+    );
     return url.toString();
   }
 
-  async fetchUser(code: string) {
-    const { accessToken, tokenType } = await this.fetchToken(code);
+  async fetchUser(code: string, state: string, cookies: Pick<Cookies, "get">) {
+    const isValidState = validateState(state, cookies);
 
-    const user = await fetch("https:/discord.com/api/users/@me", {
+    if (!isValidState) throw new InvalidStateError();
+
+    const { accessToken, tokenType } = await this.fetchToken(
+      code,
+      getCodeVerifier(cookies)
+    );
+
+    console.log(this.urls.user, accessToken, tokenType);
+    const user = await fetch(this.urls.user, {
       headers: {
         Authorization: `${tokenType} ${accessToken}`,
       },
     })
       .then((res) => res.json())
       .then((rawData) => {
-        console.log("Raw data", rawData);
-        const { data, success, error } = this.userSchema.safeParse(rawData);
+        console.log(rawData);
+        const { data, success, error } =
+          this.userInfo.schema.safeParse(rawData);
 
         if (!success) throw new InvalidUserError(error);
         return data;
       });
 
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.global_name ?? user.username,
-    };
+    return this.userInfo.parser(user);
   }
 
-  private async fetchToken(code: string) {
-    return fetch("https://discord.com/api/oauth2/token", {
+  private async fetchToken(code: string, codeVerifier: string) {
+    return fetch(this.urls.token, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -63,13 +122,13 @@ export class OAuthClient<T> {
         code,
         redirect_uri: this.redirectUrl.toString(),
         grant_type: "authorization_code",
-        client_id: env.DISCORD_CLIENT_ID,
-        client_secret: env.DISCORD_CLIENT_SECRET,
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        code_verifier: codeVerifier,
       }),
     })
       .then((res) => res.json())
       .then((rawData) => {
-        console.log("Raw data", rawData);
         const { data, success, error } = this.tokenSchema.safeParse(rawData);
 
         if (!success) throw new InvalidTokenError(error);
@@ -82,15 +141,72 @@ export class OAuthClient<T> {
   }
 }
 
-export class InvalidTokenError extends Error {
+export function getOAuthClient(provider: OAuthProvider) {
+  switch (provider) {
+    case "discord":
+      return createDiscordOAuthClient();
+    case "github":
+      return createGithubOAuthClient();
+    default:
+      throw new Error(`Invalid provider: ${provider satisfies never}`);
+  }
+}
+
+class InvalidTokenError extends Error {
   constructor(zodError: z.ZodError) {
     super("Invalid Token");
     this.cause = zodError;
   }
 }
-export class InvalidUserError extends Error {
+class InvalidUserError extends Error {
   constructor(zodError: z.ZodError) {
     super("Invalid User");
     this.cause = zodError;
   }
+}
+
+class InvalidStateError extends Error {
+  constructor() {
+    super("Invalid state");
+  }
+}
+class InvalidCodeVerifierError extends Error {
+  constructor() {
+    super("Invalid code verifier");
+  }
+}
+
+function createState(cookies: Pick<Cookies, "set">) {
+  const state = crypto.randomBytes(64).toString("hex").normalize();
+  cookies.set(STATE_COOKIE_KEY, state, {
+    secure: true,
+    httpOnly: true,
+    sameSite: "lax",
+    expires: Date.now() + COOKIE_EXPIRATION_SECONDS * 1000,
+  });
+
+  return state;
+}
+
+function createCodeVerifier(cookies: Pick<Cookies, "set">) {
+  const codeVerifier = crypto.randomBytes(64).toString("hex").normalize();
+  cookies.set(CODE_VERIFIER_COOKIE_KEY, codeVerifier, {
+    secure: true,
+    httpOnly: true,
+    sameSite: "lax",
+    expires: Date.now() + COOKIE_EXPIRATION_SECONDS * 1000,
+  });
+
+  return codeVerifier;
+}
+
+function validateState(state: string, cookies: Pick<Cookies, "get">) {
+  const cookieState = cookies.get(STATE_COOKIE_KEY)?.value;
+  return cookieState === state;
+}
+
+function getCodeVerifier(cookies: Pick<Cookies, "get">) {
+  const codeVerifier = cookies.get(CODE_VERIFIER_COOKIE_KEY)?.value;
+  if (codeVerifier == null) throw new InvalidCodeVerifierError();
+  return codeVerifier;
 }

@@ -14,7 +14,7 @@ import { cookies } from "next/headers";
 import { createUserSession } from "@/auth/core/session";
 import { eq } from "drizzle-orm/sql";
 import { COOKIE_SESSION_KEY } from "@/auth/core/constants";
-import { OAuthClient } from "@/auth/core/oauth/base";
+import { getOAuthClient } from "@/auth/core/oauth/base";
 
 export async function logOut() {
   const cookieStore = await cookies();
@@ -98,6 +98,7 @@ export async function signUp(unsafeData: z.infer<typeof signUpSchema>) {
 
 export async function oAuthSignIn(provider: OAuthProvider) {
   //TODO: Get OAuth url
+  const oAuthClient = getOAuthClient(provider);
 
-  redirect(new OAuthClient().createAuthUrl(await cookies()));
+  redirect(oAuthClient.createAuthUrl(await cookies()));
 }
