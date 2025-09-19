@@ -1,10 +1,10 @@
-import crypto from "crypto";
-import { Cookies } from "@/auth/core/types";
-import { env } from "@/data/env/server";
-import z from "zod";
-import { OAuthProvider } from "@/drizzle/schema";
 import { createDiscordOAuthClient } from "@/auth/core/oauth/discord";
 import { createGithubOAuthClient } from "@/auth/core/oauth/github";
+import { Cookies } from "@/auth/core/types";
+import { env } from "@/data/env/server";
+import { OAuthProvider } from "@/drizzle/schema";
+import crypto from "crypto";
+import z from "zod";
 
 const STATE_COOKIE_KEY = "oAuthState";
 const COOKIE_EXPIRATION_SECONDS = 10 * 60;
@@ -92,7 +92,6 @@ export class OAuthClient<T> {
       getCodeVerifier(cookies)
     );
 
-    console.log(this.urls.user, accessToken, tokenType);
     const user = await fetch(this.urls.user, {
       headers: {
         Authorization: `${tokenType} ${accessToken}`,
@@ -100,7 +99,6 @@ export class OAuthClient<T> {
     })
       .then((res) => res.json())
       .then((rawData) => {
-        console.log(rawData);
         const { data, success, error } =
           this.userInfo.schema.safeParse(rawData);
 
