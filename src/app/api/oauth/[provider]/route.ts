@@ -49,33 +49,54 @@ export async function GET(
   redirect("/");
 }
 
-function connectUserToAccount(
+async function connectUserToAccount(
   { id, email, name }: { id: string; email: string; name: string },
   provider: OAuthProvider
 ) {
-  return db.transaction(async (tx) => {
-    let user = await tx.query.UserTable.findFirst({
-      where: eq(UserTable.email, email),
-      columns: { id: true, role: true },
-    });
-
-    if (user == null) {
-      const [newUser] = await tx
-        .insert(UserTable)
-        .values({ email, name })
-        .returning({ id: UserTable.id, role: UserTable.role });
-      user = newUser;
-    }
-
-    await tx
-      .insert(UserOAuthAccountTable)
-      .values({
-        provider,
-        providerAccountId: id,
-        userId: user.id,
-      })
-      .onConflictDoNothing();
-
-    return user;
+  let user = await db.query.UserTable.findFirst({
+    where: eq(UserTable.email, email),
+    columns: { id: true, role: true },
   });
+
+  if (user == null) {
+    const [newUser] = await db
+      .insert(UserTable)
+      .values({ email, name })
+      .returning({ id: UserTable.id, role: UserTable.role });
+    user = newUser;
+  }
+
+  await db
+    .insert(UserOAuthAccountTable)
+    .values({
+      provider,
+      providerAccountId: id,
+      userId: user.id,
+    })
+    .onConflictDoNothing();
+
+  return user;
+  // let user = await tx.query.UserTable.findFirst({
+  //   where: eq(UserTable.email, email),
+  //   columns: { id: true, role: true },
+  // });
+
+  // if (user == null) {
+  //   const [newUser] = await tx
+  //     .insert(UserTable)
+  //     .values({ email, name })
+  //     .returning({ id: UserTable.id, role: UserTable.role });
+  //   user = newUser;
+  // }
+
+  // await tx
+  //   .insert(UserOAuthAccountTable)
+  //   .values({
+  //     provider,
+  //     providerAccountId: id,
+  //     userId: user.id,
+  //   })
+  //   .onConflictDoNothing();
+
+  // return user;
 }
