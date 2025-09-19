@@ -1,7 +1,7 @@
 import { COOKIE_SESSION_KEY } from "@/auth/core/constants";
 import { db } from "@/drizzle/db";
-import { UserTable, SessionTable } from "@/drizzle/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { SessionTable, UserTable } from "@/drizzle/schema";
+import { and, eq, gt } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
@@ -10,7 +10,7 @@ export async function GET() {
 
   const sessionId = cookieStore.get(COOKIE_SESSION_KEY)?.value;
 
-  if (sessionId == null) return null;
+  if (sessionId == null) return NextResponse.json({ user: null });
 
   const [user] = await db
     .select({
