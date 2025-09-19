@@ -10,7 +10,8 @@ export async function GET() {
 
   const sessionId = cookieStore.get(COOKIE_SESSION_KEY)?.value;
 
-  if (sessionId == null) return NextResponse.json({ user: null });
+  if (sessionId == null)
+    return NextResponse.json({ user: null }, { status: 401 });
 
   const [user] = await db
     .select({
