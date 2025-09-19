@@ -1,13 +1,9 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import * as schema from "./schema";
 import { env } from "@/data/env/server";
+import { neon, neonConfig } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
+import ws from "ws";
+neonConfig.webSocketConstructor = ws;
 
-export const db = drizzle({
-  schema,
-  connection: {
-    password: env.DB_PASSWORD,
-    user: env.DB_USER,
-    database: env.DB_NAME,
-    host: env.DB_HOST,
-  },
-});
+const sql = neon(env.DB_URL);
+
+export const db = drizzle({ client: sql });

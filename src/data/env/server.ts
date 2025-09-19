@@ -8,10 +8,11 @@ export const env = createEnv({
    * Will throw if you access these variables on the client.
    */
   server: {
-    DB_PASSWORD: z.string().min(1),
-    DB_USER: z.string().min(1),
-    DB_NAME: z.string().min(1),
-    DB_HOST: z.string().min(1),
+    // DB_PASSWORD: z.string().min(1),
+    // DB_USER: z.string().min(1),
+    // DB_NAME: z.string().min(1),
+    // DB_HOST: z.string().min(1),
+    DB_URL: z.string().min(1),
     DISCORD_CLIENT_ID: z.string().min(1),
     DISCORD_CLIENT_SECRET: z.string().min(1),
     GITHUB_CLIENT_ID: z.string().min(1),
